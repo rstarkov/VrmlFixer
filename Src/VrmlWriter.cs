@@ -10,14 +10,16 @@ namespace VrmlFixer;
 
 public class VrmlWriter(StreamWriter wr)
 {
+    public int Indent { get; set; } = 2;
+
     private int indent = 0;
-    private void Wi() => wr.Write(new string(' ', indent));
+    private void Wi() => wr.Write(new string(' ', indent * Indent));
     private void W(string s) => wr.Write(s);
     private void WL(string s) => wr.WriteLine(s);
     private void WiL(string s)
     {
         if (indent > 0)
-            wr.Write(new string(' ', indent));
+            wr.Write(new string(' ', indent * Indent));
         wr.WriteLine(s);
     }
 
