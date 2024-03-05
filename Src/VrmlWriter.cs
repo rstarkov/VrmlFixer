@@ -151,12 +151,11 @@ public class VrmlWriter(StreamWriter wr)
                 case MFInt32 mfInt32:
                     if (mfInt32.Length == 0 && ((MFInt32)defaultField).Length == 0)
                         break;
-                    WiL($"{field.Key} [");
-                    indent++;
+                    Wi();
+                    W($"{field.Key} [");
                     foreach (var i in mfInt32)
-                        WiL(i.Value.ToString());
-                    indent--;
-                    WiL("]");
+                        W($" {i.Value}");
+                    WL("]");
                     break;
                 case MFVec3f mfVec3f:
                     if (mfVec3f.Length == 0 && ((MFInt32)defaultField).Length == 0)
@@ -164,7 +163,7 @@ public class VrmlWriter(StreamWriter wr)
                     WiL($"{field.Key} [");
                     indent++;
                     foreach (var vec in mfVec3f)
-                        WiL($"{vec.X} {vec.Y} {vec.Z}");
+                        WiL($"{vec.X} {vec.Y} {vec.Z},");
                     indent--;
                     WiL("]");
                     break;
@@ -176,7 +175,7 @@ public class VrmlWriter(StreamWriter wr)
                     GraphWriteNode(sfNode.Node);
                     break;
                 case MFNode mfNode:
-                    if (mfNode.Length == 0 && ((MFInt32)defaultField).Length == 0)
+                    if (mfNode.Length == 0 && ((MFNode)defaultField).Length == 0)
                         break;
                     WiL($"{field.Key} [");
                     indent++;
