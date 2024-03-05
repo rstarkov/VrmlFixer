@@ -1,0 +1,3 @@
+[submodule "External/Graph3D.Vrml"]
+	path = External/Graph3D.Vrml
+	url = git@github.com:SavchukSergey/graph3D.vrml.git
