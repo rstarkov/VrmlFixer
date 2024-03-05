@@ -26,6 +26,25 @@ public class VrmlWriter(StreamWriter wr)
     private Dictionary<BaseNode, int> _refs;
     private Dictionary<BaseNode, string> _refNames;
     private HashSet<BaseNode> _refsWritten;
+    public Dictionary<BaseNode, int> NodeIds = [];
+    public Dictionary<BaseNode, int> NodeLengths;
+
+    public void AssignNodeIds(BaseNode node)
+    {
+        if (node == null)
+            return;
+        if (NodeIds.ContainsKey(node))
+            return;
+        NodeIds.Add(node, NodeIds.Count);
+        foreach (var field in node.AllFields)
+        {
+            if (field.Value is SFNode sfNode)
+                AssignNodeIds(sfNode.Node);
+            else if (field.Value is MFNode mfNode)
+                foreach (var n in mfNode)
+                    AssignNodeIds(n);
+        }
+    }
 
     public void WriteScene(VrmlScene scene)
     {
@@ -37,6 +56,7 @@ public class VrmlWriter(StreamWriter wr)
                 _refNames.Add(kvp.Key, $"R{_refNames.Count}");
 
         _refsWritten = [];
+        NodeLengths = [];
         WiL("#VRML V2.0 utf8");
         foreach (var rootchild in scene.Root.Children)
             GraphWriteNode(rootchild);
@@ -64,6 +84,7 @@ public class VrmlWriter(StreamWriter wr)
 
     private void GraphWriteNode(BaseNode node)
     {
+        var start = wr.BaseStream.Position;
         // write DEF/USE
         if (_refNames.ContainsKey(node))
         {
@@ -173,5 +194,8 @@ public class VrmlWriter(StreamWriter wr)
         }
         indent--;
         WiL("}");
+
+        wr.Flush();
+        NodeLengths.Add(node, (int)(wr.BaseStream.Position - start));
     }
 }
