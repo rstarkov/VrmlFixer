@@ -1,4 +1,4 @@
-﻿using Graph3D.Vrml;
+using Graph3D.Vrml;
 using Graph3D.Vrml.Parser;
 using Graph3D.Vrml.Tokenizer;
 
@@ -15,7 +15,7 @@ internal class Program
         using (var sw = new StreamWriter(@"..\..\..\Pico-rewrite.wrl"))
         {
             var wr = new VrmlWriter(sw);
-            wr.GraphWriteScene(scene);
+            wr.WriteScene(scene);
         }
     }
 }

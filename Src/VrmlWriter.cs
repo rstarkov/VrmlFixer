@@ -21,11 +21,26 @@ public class VrmlWriter(StreamWriter wr)
         wr.WriteLine(s);
     }
 
-    private Dictionary<BaseNode, int> _refs = new();
-    private Dictionary<BaseNode, string> _refNames = new();
-    private HashSet<BaseNode> _refsWritten = new();
+    private Dictionary<BaseNode, int> _refs;
+    private Dictionary<BaseNode, string> _refNames;
+    private HashSet<BaseNode> _refsWritten;
 
-    public void DiscoverRefs(BaseNode node)
+    public void WriteScene(VrmlScene scene)
+    {
+        _refs = [];
+        DiscoverRefs(scene.Root);
+        _refNames = [];
+        foreach (var kvp in _refs)
+            if (kvp.Value > 1)
+                _refNames.Add(kvp.Key, $"R{_refNames.Count}");
+
+        _refsWritten = [];
+        WiL("#VRML V2.0 utf8");
+        foreach (var rootchild in scene.Root.Children)
+            GraphWriteNode(rootchild);
+    }
+
+    private void DiscoverRefs(BaseNode node)
     {
         if (node == null)
             return;
@@ -45,7 +60,7 @@ public class VrmlWriter(StreamWriter wr)
         }
     }
 
-    public void GraphWriteNode(BaseNode node)
+    private void GraphWriteNode(BaseNode node)
     {
         // write DEF/USE
         if (_refNames.ContainsKey(node))
@@ -128,18 +143,5 @@ public class VrmlWriter(StreamWriter wr)
         }
         indent--;
         WiL("}");
-    }
-
-    public void GraphWriteScene(VrmlScene scene)
-    {
-        DiscoverRefs(scene.Root);
-        _refNames = new();
-        foreach (var kvp in _refs)
-            if (kvp.Value > 1)
-                _refNames.Add(kvp.Key, $"ref_{Random.Shared.NextDouble().ToString().Replace("0.", "")}");
-        _refsWritten = new();
-        WiL("#VRML V2.0 utf8");
-        foreach (var rootchild in scene.Root.Children)
-            GraphWriteNode(rootchild);
     }
 }
