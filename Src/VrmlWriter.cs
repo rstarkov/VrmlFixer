@@ -88,22 +88,46 @@ public class VrmlWriter(StreamWriter wr)
             case CoordinateNode: WL("Coordinate {"); break;
             default: throw new NotImplementedException();
         }
+        // get default fields
+        var defaultNode = (BaseNode)node.GetType().GetConstructor([]).Invoke([]);
         // write fields
         indent++;
         foreach (var field in node.AllFields.OrderBy(f => f.Value is MField ? 2 : f.Value is SFNode ? 1 : 0).ThenBy(f => f.Key))
         {
-            if (!node.ExposedFieldNames.Contains(field.Key))
-                continue;
+            var defaultField = defaultNode.GetField(field.Key);
             switch (field.Value)
             {
-                case SFBool sfBool: WiL($"{field.Key} {sfBool.Value.ToString().ToUpper()}"); break;
-                case SFInt32 sfInt32: WiL($"{field.Key} {sfInt32.Value}"); break;
-                case SFFloat sfFloat: WiL($"{field.Key} {sfFloat.Value}"); break;
-                case SFString sfString: WiL($"{field.Key} {sfString.Value}"); break;
-                case SFColor sfColor: WiL($"{field.Key} {sfColor.Red} {sfColor.Green} {sfColor.Blue}"); break;
-                case SFVec3f sfVec3f: WiL($"{field.Key} {sfVec3f.X} {sfVec3f.Y} {sfVec3f.Z}"); break;
-                case SFRotation sfRotation: WiL($"{field.Key} {sfRotation.X} {sfRotation.Y} {sfRotation.Z} {sfRotation.Angle}"); break;
+                case SFBool bl:
+                    if (bl.Value != ((SFBool)defaultField).Value)
+                        WiL($"{field.Key} {bl.Value.ToString().ToUpper()}");
+                    break;
+                case SFInt32 int32:
+                    if (int32.Value != ((SFInt32)defaultField).Value)
+                        WiL($"{field.Key} {int32.Value}");
+                    break;
+                case SFString sfString:
+                    if (sfString.Value != ((SFString)defaultField).Value)
+                        WiL($"{field.Key} {sfString.Value}");
+                    break;
+                case SFFloat flt:
+                    if (flt.Value != ((SFFloat)defaultField).Value)
+                        WiL($"{field.Key} {flt.Value}");
+                    break;
+                case SFColor clr:
+                    if (clr.Red != ((SFColor)defaultField).Red || clr.Green != ((SFColor)defaultField).Green || clr.Blue != ((SFColor)defaultField).Blue)
+                        WiL($"{field.Key} {clr.Red} {clr.Green} {clr.Blue}");
+                    break;
+                case SFVec3f vec3f:
+                    if (vec3f.X != ((SFVec3f)defaultField).X || vec3f.Y != ((SFVec3f)defaultField).Y || vec3f.Z != ((SFVec3f)defaultField).Z)
+                        WiL($"{field.Key} {vec3f.X} {vec3f.Y} {vec3f.Z}");
+                    break;
+                case SFRotation rot:
+                    if (rot.X != ((SFRotation)defaultField).X || rot.Y != ((SFRotation)defaultField).Y || rot.Z != ((SFRotation)defaultField).Z || rot.Angle != ((SFRotation)defaultField).Angle)
+                        WiL($"{field.Key} {rot.X} {rot.Y} {rot.Z} {rot.Angle}");
+                    break;
                 case MFInt32 mfInt32:
+                    if (mfInt32.Length == 0 && ((MFInt32)defaultField).Length == 0)
+                        break;
                     WiL($"{field.Key} [");
                     indent++;
                     foreach (var i in mfInt32)
@@ -112,6 +136,8 @@ public class VrmlWriter(StreamWriter wr)
                     WiL("]");
                     break;
                 case MFVec3f mfVec3f:
+                    if (mfVec3f.Length == 0 && ((MFInt32)defaultField).Length == 0)
+                        break;
                     WiL($"{field.Key} [");
                     indent++;
                     foreach (var vec in mfVec3f)
@@ -127,6 +153,8 @@ public class VrmlWriter(StreamWriter wr)
                     GraphWriteNode(sfNode.Node);
                     break;
                 case MFNode mfNode:
+                    if (mfNode.Length == 0 && ((MFInt32)defaultField).Length == 0)
+                        break;
                     WiL($"{field.Key} [");
                     indent++;
                     foreach (var n in mfNode)
