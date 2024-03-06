@@ -1,4 +1,4 @@
-﻿using Graph3D.Vrml;
+using Graph3D.Vrml;
 using Graph3D.Vrml.Fields;
 using Graph3D.Vrml.Nodes;
 using Graph3D.Vrml.Nodes.Geometry;
@@ -21,9 +21,10 @@ internal class Program
             var wr = new VrmlWriter(sw) { Indent = 0 };
             wr.AssignNodeIds(scene.Root);
             DeleteJunk(wr, scene.Root);
+            UnifyShapes(wr, scene.Root);
             wr.WriteScene(scene);
-            printNodeLengths(wr, scene.Root, 0);
-            printLargeShapes(wr);
+            //printNodeLengths(wr, scene.Root, 0);
+            //printLargeShapes(wr);
         }
     }
 
@@ -121,5 +122,54 @@ internal class Program
             }
         }
         return faces;
+    }
+
+    private static void UnifyShapes(VrmlWriter wr, BaseNode node)
+    {
+        if (node == null)
+            return;
+
+        if (node is GroupNode gn)
+        {
+            // unify all the shapes by appearance, by contactenating their faces together and deduplicating the points
+            var ifsShapes = gn.Children.OfType<ShapeNode>().Where(sn => sn.Geometry is IndexedFaceSetNode).ToHashSet();
+            var otherChildren = gn.Children.Where(c => !ifsShapes.Contains(c)).ToList();
+            gn.Children._values.Clear();
+            gn.Children._values.AddRange(otherChildren);
+            var groups = ifsShapes.GroupBy(s => s.Appearance);
+            foreach (var group in groups)
+            {
+                var faces = group.Select(s => GetFaces((IndexedFaceSetNode)s.Geometry)).SelectMany(f => f).ToList();
+                // deduplicate the faces - primitive; ignores normal direction
+                faces = faces.DistinctBy(pts => string.Join("|", pts.Select(pt => $"{pt.X},{pt.Y},{pt.Z}").Order())).ToList();
+                var newShape = new ShapeNode();
+                newShape.Appearance = group.Key;
+                var newifs = new IndexedFaceSetNode();
+                newifs.Solid.Value = false;
+                newShape.Geometry = newifs;
+                var points = faces.SelectMany(f => f).Distinct().ToList();
+                var cn = new CoordinateNode();
+                foreach (var pt in points)
+                    cn.Point.AppendValue(pt);
+                newifs.Coord.Node = cn;
+                newifs.CoordIndex.ClearValues();
+                foreach (var face in faces)
+                {
+                    foreach (var pt in face)
+                        newifs.CoordIndex.AppendValue(new SFInt32(points.IndexOf(pt)));
+                    newifs.CoordIndex.AppendValue(new SFInt32(-1));
+                }
+                gn.Children._values.Add(newShape);
+            }
+        }
+
+        foreach (var field in node.AllFields)
+        {
+            if (field.Value is SFNode sfNode)
+                UnifyShapes(wr, sfNode.Node);
+            else if (field.Value is MFNode mfNode)
+                foreach (var n in mfNode)
+                    UnifyShapes(wr, n);
+        }
     }
 }
