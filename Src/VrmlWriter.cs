@@ -151,21 +151,38 @@ public class VrmlWriter(StreamWriter wr)
                 case MFInt32 mfInt32:
                     if (mfInt32.Length == 0 && ((MFInt32)defaultField).Length == 0)
                         break;
+#if false // multi-line
+                    WiL($"{field.Key} [");
+                    indent++;
+                    foreach (var i in mfInt32)
+                        WiL(i.Value.ToString());
+                    indent--;
+                    WiL("]");
+#else // single-line
                     Wi();
                     W($"{field.Key} [");
                     foreach (var i in mfInt32)
                         W($" {i.Value}");
-                    WL("]");
+                    WL(" ]");
+#endif
                     break;
                 case MFVec3f mfVec3f:
                     if (mfVec3f.Length == 0 && ((MFInt32)defaultField).Length == 0)
                         break;
+#if false // multi-line
                     WiL($"{field.Key} [");
                     indent++;
                     foreach (var vec in mfVec3f)
                         WiL($"{vec.X} {vec.Y} {vec.Z},");
                     indent--;
                     WiL("]");
+#else
+                    Wi();
+                    W($"{field.Key} [");
+                    foreach (var vec in mfVec3f)
+                        W($" {vec.X} {vec.Y} {vec.Z}");
+                    WL(" ]");
+#endif
                     break;
                 case SFNode sfNode:
                     if (sfNode.Node == null)
