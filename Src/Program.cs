@@ -1,4 +1,4 @@
-﻿using System.Xml.Linq;
+using System.Xml.Linq;
 using Graph3D.Vrml;
 using Graph3D.Vrml.Fields;
 using Graph3D.Vrml.Nodes;
@@ -46,6 +46,7 @@ internal class Program
         //printLargeShapes(wr);
     }
 
+    /// <summary>Delete specific nodes from Pico.wrl.</summary>
     private static bool DeletePicoWrlJunk(VrmlWriter wr, BaseNode node)
     {
         if (node == null)
@@ -131,6 +132,10 @@ internal class Program
         return faces;
     }
 
+    /// <summary>
+    ///     Within a single group, take all shapes that share the material and unify all the faces into a single shape. This
+    ///     helps make the insane Sketchup export usable in Blender. Has a major flaw in that it ignores normals: all shapes
+    ///     must be fixed in Blender with Normals / Recalculate Outside.</summary>
     private static void UnifyShapes(VrmlWriter wr, BaseNode node)
     {
         if (node == null)
@@ -184,12 +189,14 @@ internal class Program
 
     private static Dictionary<MaterialNode, AppearanceNode> _matApp = [];
 
+    /// <summary>Apply a few tweaks to what Blender outputs.</summary>
     private static BaseNode Cleanup(VrmlWriter wr, BaseNode node)
     {
         if (node == null)
             return null;
         if (node is TransformNode tn)
         {
+            // Blender sets unused rotations to 0,0,0,0. Fix them to 0,0,1,0 so that the writer knows that it's actually the default and skips it.
             if (tn.Rotation.Angle == 0)
             {
                 tn.Rotation.X = tn.Rotation.Y = 0;
@@ -198,19 +205,21 @@ internal class Program
         }
         else if (node is AppearanceNode an)
         {
-            // ignoring texture
+            // ignoring texture, unify Appearances that use the same (by ref) Material
             if (_matApp.ContainsKey(an.Material))
                 return _matApp[an.Material];
             _matApp.Add(an.Material, an);
         }
         else if (node is MaterialNode mn)
         {
+            // reset some props to default - specific to the project this was coded for
             mn.AmbientIntensity = 0.2f;
             mn.Shininess = 0.2f;
             mn.SpecularColor.Red = mn.SpecularColor.Green = mn.SpecularColor.Blue = 0;
         }
         else if (node is IndexedFaceSetNode ifs)
         {
+            // reset some props to default - specific to the project this was coded for
             ifs.Solid.Value = true;
         }
 
@@ -223,14 +232,19 @@ internal class Program
                     mfNode[i] = Cleanup(wr, mfNode[i]);
         }
 
+        // un-wrap groups that have a single child
         if (node is GroupNode gn && gn.Children.Length == 1)
             return gn.Children[0];
+        // un-wrap single-child identity (non-)transforms
         else if (node is TransformNode tn2 && tn2.Children.Length == 1 && tn2.Scale.X == 1 && tn2.Scale.Y == 1 && tn2.Scale.Z == 1 && tn2.Rotation.Angle == 0 && tn2.Translation.X == 0 && tn2.Translation.Y == 0 && tn2.Translation.Z == 0)
             return tn2.Children[0];
         else
             return node;
     }
 
+    /// <summary>
+    ///     Find transforms that apply the same transformation (only within a single grouping node) and merge all children
+    ///     into a single transform.</summary>
     private static void UnifyIdenticalTransforms(VrmlWriter wr, BaseNode node)
     {
         if (node == null)
