@@ -12,52 +12,44 @@ internal class Program
 {
     static void Main(string[] args)
     {
-        var p = new VrmlParser(new Vrml97Tokenizer(new StringReader(File.ReadAllText(@"..\..\..\Pico.wrl"))));
+        InitialRewriteOfPicoWrl();
+    }
+
+    static void InitialRewriteOfPicoWrl()
+    {
+        var p = new VrmlParser(new Vrml97Tokenizer(new StringReader(File.ReadAllText(@"..\..\..\Pico-rewrite.wrl"))));
         var scene = new VrmlScene();
         p.Parse(scene);
 
-        using (var sw = new StreamWriter(@"..\..\..\Pico-rewrite.wrl"))
-        {
-            var wr = new VrmlWriter(sw) { Indent = 0 };
-            wr.AssignNodeIds(scene.Root);
-            DeleteJunk(wr, scene.Root);
-            UnifyShapes(wr, scene.Root);
-            wr.WriteScene(scene);
-            //printNodeLengths(wr, scene.Root, 0);
-            //printLargeShapes(wr);
-        }
+        using var sw = new StreamWriter(@"..\..\..\Pico.wrl");
+        var wr = new VrmlWriter(sw) { Indent = 0 };
+        wr.AssignNodeIds(scene.Root);
+        DeletePicoWrlJunk(wr, scene.Root);
+        UnifyShapes(wr, scene.Root);
+        wr.WriteScene(scene);
+        //printNodeLengths(wr, scene.Root, 0);
+        //printLargeShapes(wr);
     }
 
-    private static bool DeleteJunk(VrmlWriter wr, BaseNode node)
+    private static bool DeletePicoWrlJunk(VrmlWriter wr, BaseNode node)
     {
         if (node == null)
             return false;
 
-        // groups 18862 and 18863 are empty
-        if (node is GroupNode && wr.NodeIds[node] != 14607)
-            return true; // select specific group only
         if (node is ShapeNode shn)
         {
             if (shn.Geometry is IndexedLineSetNode)
                 return true;
-            //if (shn.Geometry is IndexedFaceSetNode)
-            //    return true; // remove EVERYTHING
-            //if (shn.Geometry is IndexedFaceSetNode ifs && ifs.CoordIndex.Length <= 4)
-            //    return true; // some large planes defined with these
-            //return new[] { 8680, 8685, 8708, 8711, 8714, 8717, 8696 }.Contains(wr.NodeIds[node]);
-            //if (shn.Geometry is IndexedFaceSetNode ifs && ifs.CoordIndex.Length > 5)
-            //    return true;
-            //return shn.Geometry is IndexedFaceSetNode ifs && ifs.CoordIndex.Length < 10;
-            //if (shn.Geometry is IndexedFaceSetNode)
-            //    return Random.Shared.NextDouble() > 0.1;
+            var id = wr.NodeIds[node];
+            return id == 101 || id == 137 || id == 150 || id == 213 || id == 216;
         }
 
         foreach (var field in node.AllFields)
         {
             if (field.Value is SFNode sfNode)
-                DeleteJunk(wr, sfNode.Node);
+                DeletePicoWrlJunk(wr, sfNode.Node);
             else if (field.Value is MFNode mfNode)
-                mfNode._values.RemoveAll(n => DeleteJunk(wr, n));
+                mfNode._values.RemoveAll(n => DeletePicoWrlJunk(wr, n));
         }
 
         if (node is GroupNode gn && gn.Children.Length == 0)
@@ -155,6 +147,8 @@ internal class Program
                 newifs.CoordIndex.ClearValues();
                 foreach (var face in faces)
                 {
+                    //if (Random.Shared.NextDouble() > 0.5)
+                    //    (face[0], face[1]) = (face[1], face[0]);
                     foreach (var pt in face)
                         newifs.CoordIndex.AppendValue(new SFInt32(points.IndexOf(pt)));
                     newifs.CoordIndex.AppendValue(new SFInt32(-1));
