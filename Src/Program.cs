@@ -1,6 +1,8 @@
+﻿using System.Xml.Linq;
 using Graph3D.Vrml;
 using Graph3D.Vrml.Fields;
 using Graph3D.Vrml.Nodes;
+using Graph3D.Vrml.Nodes.Appearance;
 using Graph3D.Vrml.Nodes.Geometry;
 using Graph3D.Vrml.Nodes.Grouping;
 using Graph3D.Vrml.Parser;
@@ -10,9 +12,22 @@ namespace VrmlFixer;
 
 internal class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
-        InitialRewriteOfPicoWrl();
+        FinalRewriteOfBlenderX3d();
+        // InitialRewriteOfPicoWrl();
+    }
+
+    static void FinalRewriteOfBlenderX3d()
+    {
+        var scn = new X3dReader().Read(XElement.Load(@"..\..\..\blender.x3d"));
+        using var sw = new StreamWriter(@"..\..\..\blender.wrl");
+        var wr = new VrmlWriter(sw) { Indent = 1 };
+        wr.AssignNodeIds(scn.Root);
+        UnifyShapes(wr, scn.Root);
+        Cleanup(wr, scn.Root);
+        UnifyIdenticalTransforms(wr, scn.Root);
+        wr.WriteScene(scn);
     }
 
     static void InitialRewriteOfPicoWrl()
@@ -164,6 +179,86 @@ internal class Program
             else if (field.Value is MFNode mfNode)
                 foreach (var n in mfNode)
                     UnifyShapes(wr, n);
+        }
+    }
+
+    private static Dictionary<MaterialNode, AppearanceNode> _matApp = [];
+
+    private static BaseNode Cleanup(VrmlWriter wr, BaseNode node)
+    {
+        if (node == null)
+            return null;
+        if (node is TransformNode tn)
+        {
+            if (tn.Rotation.Angle == 0)
+            {
+                tn.Rotation.X = tn.Rotation.Y = 0;
+                tn.Rotation.Z = 1;
+            }
+        }
+        else if (node is AppearanceNode an)
+        {
+            // ignoring texture
+            if (_matApp.ContainsKey(an.Material))
+                return _matApp[an.Material];
+            _matApp.Add(an.Material, an);
+        }
+        else if (node is MaterialNode mn)
+        {
+            mn.AmbientIntensity = 0.2f;
+            mn.Shininess = 0.2f;
+            mn.SpecularColor.Red = mn.SpecularColor.Green = mn.SpecularColor.Blue = 0;
+        }
+        else if (node is IndexedFaceSetNode ifs)
+        {
+            ifs.Solid.Value = true;
+        }
+
+        foreach (var field in node.AllFields)
+        {
+            if (field.Value is SFNode sfNode)
+                sfNode.Node = Cleanup(wr, sfNode.Node);
+            else if (field.Value is MFNode mfNode)
+                for (int i = 0; i < mfNode.Length; i++)
+                    mfNode[i] = Cleanup(wr, mfNode[i]);
+        }
+
+        if (node is GroupNode gn && gn.Children.Length == 1)
+            return gn.Children[0];
+        else if (node is TransformNode tn2 && tn2.Children.Length == 1 && tn2.Scale.X == 1 && tn2.Scale.Y == 1 && tn2.Scale.Z == 1 && tn2.Rotation.Angle == 0 && tn2.Translation.X == 0 && tn2.Translation.Y == 0 && tn2.Translation.Z == 0)
+            return tn2.Children[0];
+        else
+            return node;
+    }
+
+    private static void UnifyIdenticalTransforms(VrmlWriter wr, BaseNode node)
+    {
+        if (node == null)
+            return;
+
+        if (node is GroupingNode gn)
+        {
+            var transforms = gn.Children.OfType<TransformNode>().ToList();
+
+            string getKey(TransformNode tn) => $"{tn.Center.X},{tn.Center.Y},{tn.Center.Z},{tn.Rotation.X},{tn.Rotation.Y},{tn.Rotation.Z},{tn.Rotation.Angle},{tn.Scale.X},{tn.Scale.Y},{tn.Scale.Z},{tn.ScaleOrientation.X},{tn.ScaleOrientation.Y},{tn.ScaleOrientation.Z},{tn.ScaleOrientation.Angle},{tn.Translation.X},{tn.Translation.Y},{tn.Translation.Z}";
+
+            var grouped = transforms.GroupBy(getKey);
+            foreach (var grp in grouped.Where(g => g.Count() > 1))
+            {
+                var main = grp.First();
+                var rest = grp.Skip(1).ToHashSet();
+                main.Children._values.AddRange(rest.SelectMany(tn => tn.Children));
+                gn.Children._values.RemoveAll(tn => rest.Contains(tn));
+            }
+        }
+
+        foreach (var field in node.AllFields)
+        {
+            if (field.Value is SFNode sfNode)
+                UnifyIdenticalTransforms(wr, sfNode.Node);
+            else if (field.Value is MFNode mfNode)
+                for (int i = 0; i < mfNode.Length; i++)
+                    UnifyIdenticalTransforms(wr, mfNode[i]);
         }
     }
 }
